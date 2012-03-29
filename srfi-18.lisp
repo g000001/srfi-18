@@ -25,13 +25,6 @@
   ;; (*make-thread thunk name)
   (sb-thread::make-srfi-19-thread :name name :function thunk))
 
-#|(let ((th (thread-start! (make-thread (lambda () (princ 'a #.*standard-output*))))))
-  (princ 'b)
-  (thread-join! th))|#
-
-#|(let ((th (make-thread (lambda () :foo) "foo")))
-  (thread-start! th))|#
-
 ;; thread-name
 (defun thread-name (thread)
   (sb-thread:thread-name thread))
@@ -61,12 +54,7 @@
   (sb-thread:interrupt-thread sb-thread:*current-thread*
                               (lambda () (sleep timeout))))
 
-#|(cl:loop :for x :from 0
-      :do (thread-sleep! 1)
-          (princ x #.*standard-output*))|#
-
 ;; thread-terminate!
-
 (defun thread-terminate! (thread)
   (sb-thread:terminate-thread thread))
 
@@ -81,21 +69,25 @@
               (error "join timeout exception"))))
       (sb-thread:join-thread thread)))
 
-#|(let ((th (thread-start! (make-thread (lambda () (sleep 8) (expt 2 100))))))
-  ;; (do-something-else)
-  (thread-join! th 1  )
-  )|#
 
-
-;; make-mutex ::
-;; mutex-name ::
-;; mutex-specific ::
 (defstruct (mutex
             (:include sb-thread:mutex)
+            (:conc-name "SRFI-18-%MUTEX-")
+            ;; make-mutex
             (:constructor make-mutex
                           (&optional nam
                                      &aux (name (and nam (string nam))))))
   specific)
+
+;; mutex-specific
+(declaim (inline mutex-specific))
+(defun mutex-specific (mutex)
+  (srfi-18-%mutex-specific mutex))
+
+;; mutex-name
+(declaim (inline mutex-name))
+(defun mutex-name (mutex)
+  (srfi-18-%mutex-name mutex))
 
 ;; mutex?
 (defun mutex? (obj)
@@ -103,49 +95,56 @@
 
 ;; mutex-specific-set!
 (defun mutex-specific-set! (mutex value)
-  (setf (mutex-specific mutex) value))
-
-#|(let ((m (make-mutex)))
-  (mutex-specific-set! m :foo)
-  (mutex-specific m))|#
+  (setf (srfi-18-%mutex-specific mutex) value))
 
 ;; mutex-state
 ;; thread T: the mutex is in the locked/owned state and thread T is
 ;; the owner of the mutex
 ;; symbol not-owned: the mutex is in the locked/not-owned state
-;; symbol abandoned: the mutex is in the unlocked/abandoned state
-;; symbol not-abandoned: the mutex is in the unlocked/not-abandoned state
+;; (not-implemented) symbol abandoned: the mutex is in the unlocked/abandoned state
+;; (not-implemented) symbol not-abandoned: the mutex is in the unlocked/not-abandoned state
 
 ;;; FIXME
 (defun mutex-state (mutex)
   (or (sb-thread:mutex-owner mutex)
       :not-owned))
 
-#|(let ((m (make-mutex)))
-  (sb-thread:with-mutex (m)
-    (mutex-state m))
-  (mutex-state m))|#
-
 ;; mutex-lock!
 (defun mutex-lock! (mutex &optional timeout (thread sb-thread:*current-thread*))
   (let ((sb-thread:*current-thread* thread))
     (sb-thread:grab-mutex mutex :timeout timeout)))
 
-#|(let ((m (make-mutex)))
-  (mutex-lock! m)
-  (mutex-state m))|#
-
 ;; mutex-unlock!
-(defun mutex-unlock! (mutex)
-  (sb-thread:release-mutex mutex))
+(defun mutex-unlock! (mutex &optional condition-variable timeout)
+  (if condition-variable
+      (progn
+        (sb-thread:condition-wait condition-variable
+                                  mutex
+                                  :timeout timeout)
+        (sb-thread:release-mutex mutex))
+      (sb-thread:release-mutex mutex)))
 
 ;; condition-variable?
 ;; make-condition-variable
 ;; condition-variable-name
 ;; condition-variable-specific
+(defstruct (condition-variable
+            (:include sb-thread:waitqueue)
+            (:constructor make-condition-variable (&optional name))
+            (:predicate condition-variable?))
+  specific)
+
 ;; condition-variable-specific-set!
+(defun condition-variable-specific-set! (cv value)
+  (setf (condition-variable-specific cv) value))
+
 ;; condition-variable-signal!
+(defun condition-variable-signal! (cv)
+  (sb-thread:condition-notify cv))
+
 ;; condition-variable-broadcast!
+(defun condition-variable-broadcast! (cv)
+  (sb-thread:condition-broadcast cv))
 
 ;; current-time :: srfi-19
 ;; time? :: srfi-19
@@ -167,8 +166,10 @@
 
 ;; raise :: srfi-34
 
-;; join-timeout-exception?
-;; abandoned-mutex-exception?
-;; terminated-thread-exception?
-;; uncaught-exception?
-;; uncaught-exception-reason
+;; join-timeout-exception? (not-implemented)
+;; abandoned-mutex-exception? (not-implemented)
+;; terminated-thread-exception? (not-implemented)
+;; uncaught-exception? (not-implemented)
+;; uncaught-exception-reason (not-implemented)
+
+;;; eof
