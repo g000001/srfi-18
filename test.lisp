@@ -128,10 +128,14 @@
 (defun mailbox-get! (m) (funcall (funcall m 'get!)))
 
 (test mailbox
-  (is-true (handler-case (sb-ext:with-timeout 2
-                           (let ((mb (make-empty-mailbox)))
-                             (mailbox-put! mb 'foo)
-                             (mailbox-get! mb)
-                             (mailbox-put! mb 'bar)
-                             t ))
-             (sb-ext:timeout () nil) )))
+  (is-true (let ((th (make-thread (lambda ()
+                                    (handler-case (sb-ext:with-timeout 2
+                                                    (let ((mb (make-empty-mailbox)))
+                                                      (mailbox-put! mb 'foo)
+                                                      (mailbox-get! mb)
+                                                      (mailbox-put! mb 'bar)
+                                                      t ))
+                                      (sb-ext:timeout () nil) ))
+                                  "mailbox" )))
+             (thread-start! th)
+             (thread-join! th) )))

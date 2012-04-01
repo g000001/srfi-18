@@ -4,7 +4,7 @@
 
 (defsystem :srfi-18
   :serial t
-  :depends-on (:fiveam)
+  :depends-on (:fiveam :srfi-19 :srfi-34 :srfi-35)
   :components ((:file "package")
                #+sbcl (:file "sbcl-prim")
                (:file "srfi-18")))
